@@ -1,4 +1,4 @@
-const API_KEY = "YOUR_API_KEY_HERE";
+const API_KEY = "6d723ee6434f4004baa52ff6b26a1702";
 
 async function searchRestaurants() {
   const query = document.getElementById("search").value.trim();
