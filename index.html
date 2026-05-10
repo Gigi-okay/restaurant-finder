@@ -1,30 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Restaurant Finder</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Restaurant Finder</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 12px;
+            width: 250px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #22c55e;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #16a34a;
+        }
+
+        #results {
+            margin-top: 30px;
+            display: grid;
+            gap: 15px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: left;
+        }
+    </style>
 </head>
+
 <body>
 
-  <div class="app">
+    <h1>🍽️ Restaurant Finder</h1>
 
-    <header>
-      <h1>🍽 Restaurant Finder</h1>
-      <p>Discover the best places to eat anywhere</p>
-    </header>
+    <input id="cityInput" placeholder="Enter city (e.g. Delhi)" />
+    <button id="searchBtn">Search</button>
 
-    <div class="search-box">
-      <input type="text" id="search" placeholder="Search city (e.g. Delhi)">
-      <button onclick="searchRestaurants()">Search</button>
-    </div>
+    <div id="results"></div>
 
-    <div id="status" class="status"></div>
+    <script>
+        const API_KEY = "6d723ee6434f4004baa52ff6b26a1702"; //
 
-    <div id="results" class="grid"></div>
+        document.getElementById("searchBtn").addEventListener("click", searchRestaurants);
 
-  </div>
+        async function searchRestaurants() {
+            const city = document.getElementById("cityInput").value.trim();
+            const resultsDiv = document.getElementById("results");
 
-  <script src="script.js"></script>
+            if (!city) {
+                resultsDiv.innerHTML = "<p>Enter a city</p>";
+                return;
+            }
+
+            resultsDiv.innerHTML = "<p>Loading...</p>";
+
+            try {
+                // Geocode
+                const geoRes = await fetch(
+                    `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&apiKey=${API_KEY}`
+                );
+
+                if (!geoRes.ok) throw new Error("Geo failed");
+
+                const geoData = await geoRes.json();
+
+                if (!geoData.features || geoData.features.length === 0) {
+                    resultsDiv.innerHTML = "<p>No location found</p>";
+                    return;
+                }
+
+                const { lat, lon } = geoData.features[0].properties;
+
+                // Places
+                const placesRes = await fetch(
+                    `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=10&apiKey=${API_KEY}`
+                );
+
+                if (!placesRes.ok) throw new Error("Places failed");
+
+                const placesData = await placesRes.json();
+
+                if (!placesData.features || placesData.features.length === 0) {
+                    resultsDiv.innerHTML = "<p>No restaurants found</p>";
+                    return;
+                }
+
+                // Render
+                resultsDiv.innerHTML = "";
+
+                placesData.features.forEach(place => {
+                    const p = place.properties;
+
+                    const div = document.createElement("div");
+                    div.className = "card";
+
+                    div.innerHTML = `
+                        <h3>${p.name || "Unnamed"}</h3>
+                        <p>${p.address_line2 || "No address"}</p>
+                    `;
+
+                    resultsDiv.appendChild(div);
+                });
+
+            } catch (err) {
+                console.error(err);
+                resultsDiv.innerHTML = "<p style='color:red;'>Error. Check API key.</p>";
+            }
+        }
+    </script>
+
 </body>
 </html>
