@@ -17,8 +17,7 @@ async function searchRestaurants() {
     status.innerText = "🔍 Finding location...";
 
     const geoRes = await fetch(
-      `https://api.geoapify.com/v1/geocode/search?text=${query}&apiKey=YOUR_API_KEY_HERE`
-    );
+  `https://api.geoapify.com/v1/geocode/search?text=${query}&apiKey=${API_KEY}`
     const geoData = await geoRes.json();
 
     if (!geoData.features.length) {
