@@ -1,71 +1,71 @@
-const API_KEY = "6d723ee6434f4004baa52ff6b26a1702";
+const GEOAPIFY_API_KEY = "6d723ee6434f4004baa52ff6b26a1702"; // ⚠️ replace this
 
 async function searchRestaurants() {
-  const query = document.getElementById("search").value.trim();
-  const status = document.getElementById("status");
-  const results = document.getElementById("results");
+    const city = document.getElementById("cityInput").value.trim();
+    const resultsDiv = document.getElementById("results");
 
-  results.innerHTML = "";
-  status.innerText = "";
+    resultsDiv.innerHTML = "<p>Loading...</p>";
 
-  if (!query) {
-    alert("Please enter a city");
-    return;
-  }
-
-  try {
-    status.innerText = "🔍 Finding location...";
-
-    const geoRes = await fetch(
-  `https://api.geoapify.com/v1/geocode/search?text=${query}&apiKey=${API_KEY}`
-    const geoData = await geoRes.json();
-
-    if (!geoData.features.length) {
-      status.innerText = "❌ City not found";
-      return;
+    if (!city) {
+        resultsDiv.innerHTML = "<p>Please enter a city</p>";
+        return;
     }
 
-    const { lat, lon } = geoData.features[0].properties;
+    try {
+        // Step 1: Get coordinates from city name
+        const geoRes = await fetch(
+            `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&apiKey=${GEOAPIFY_API_KEY}`
+        );
 
-    status.innerText = "🍽 Loading restaurants...";
+        if (!geoRes.ok) {
+            throw new Error("Invalid API key or Geocoding failed");
+        }
 
-    const placesRes = await fetch(
-      `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=12&apiKey=${API_KEY}`
-    );
+        const geoData = await geoRes.json();
 
-    const placesData = await placesRes.json();
+        if (!geoData.features || geoData.features.length === 0) {
+            resultsDiv.innerHTML = "<p>No location found</p>";
+            return;
+        }
 
-    displayResults(placesData.features);
+        const { lat, lon } = geoData.features[0].properties;
 
-    status.innerText = `✅ ${placesData.features.length} restaurants found`;
+        // Step 2: Get restaurants near location
+        const placesRes = await fetch(
+            `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=10&apiKey=${GEOAPIFY_API_KEY}`
+        );
 
-  } catch (err) {
-    console.error(err);
-    status.innerText = "❌ Something went wrong";
-  }
-}
+        if (!placesRes.ok) {
+            throw new Error("Places API failed");
+        }
 
-function displayResults(places) {
-  const container = document.getElementById("results");
+        const placesData = await placesRes.json();
 
-  if (!places.length) {
-    container.innerHTML = `<p>No restaurants found</p>`;
-    return;
-  }
+        if (!placesData.features || placesData.features.length === 0) {
+            resultsDiv.innerHTML = "<p>No restaurants found</p>";
+            return;
+        }
 
-  places.forEach(place => {
-    const p = place.properties;
+        // Step 3: Render UI
+        resultsDiv.innerHTML = "";
 
-    container.innerHTML += `
-      <div class="card">
-        <h3>${p.name || "Unnamed Restaurant"}</h3>
-        <p>${p.address_line1 || ""}</p>
-        <p>${p.address_line2 || ""}</p>
+        placesData.features.forEach(place => {
+            const p = place.properties;
 
-        <div class="meta">
-          ${p.city || ""} • ${p.country || ""}
-        </div>
-      </div>
-    `;
-  });
+            const card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+                <h3>${p.name || "Unnamed Restaurant"}</h3>
+                <p>${p.address_line2 || "Address not available"}</p>
+                <p>🍽️ ${p.categories ? p.categories.join(", ") : "Restaurant"}</p>
+            `;
+
+            resultsDiv.appendChild(card);
+        });
+
+    } catch (error) {
+        console.error(error);
+        resultsDiv.innerHTML = `<p style="color:red;">Something went wrong. Check API key.</p>`;
+    }
 }
