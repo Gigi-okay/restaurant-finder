@@ -1,142 +1,221 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Restaurant Finder</title>
+<meta charset="UTF-8">
+<title>FoodSpot Pro</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            color: white;
-            text-align: center;
-            padding: 40px;
-        }
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-        h1 {
-            margin-bottom: 20px;
-        }
+<!-- Leaflet Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-        input {
-            padding: 12px;
-            width: 250px;
-            border-radius: 8px;
-            border: none;
-            outline: none;
-            margin-right: 10px;
-        }
+<style>
+* {
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
 
-        button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #22c55e;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
+body {
+    background:#0f172a;
+    color:white;
+    transition:0.3s;
+}
 
-        button:hover {
-            background: #16a34a;
-        }
+.light {
+    background:#f1f5f9;
+    color:black;
+}
 
-        #results {
-            margin-top: 30px;
-            display: grid;
-            gap: 15px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
+.container {
+    text-align:center;
+    padding:30px;
+}
 
-        .card {
-            background: #1e293b;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: left;
-        }
-    </style>
+h1 { font-size:38px; }
+
+.top-bar {
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:20px;
+    flex-wrap:wrap;
+}
+
+input, select {
+    padding:12px;
+    border-radius:8px;
+    border:none;
+}
+
+button {
+    padding:12px 18px;
+    border:none;
+    border-radius:8px;
+    background:#22c55e;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover { background:#16a34a; }
+
+#map {
+    height:300px;
+    margin:20px auto;
+    border-radius:15px;
+    max-width:900px;
+}
+
+#results {
+    display:grid;
+    gap:15px;
+    max-width:900px;
+    margin:auto;
+}
+
+.card {
+    background:#1e293b;
+    padding:15px;
+    border-radius:12px;
+    text-align:left;
+}
+
+.light .card {
+    background:white;
+}
+
+.favorite {
+    float:right;
+    cursor:pointer;
+}
+</style>
 </head>
 
 <body>
 
-    <h1>🍽️ Restaurant Finder</h1>
+<div class="container">
 
-    <input id="cityInput" placeholder="Enter city (e.g. Delhi)" />
-    <button id="searchBtn">Search</button>
+<h1>🍽️ FoodSpot Pro</h1>
 
-    <div id="results"></div>
+<div class="top-bar">
+    <input id="searchInput" placeholder="City / State / Pincode">
+    <select id="category">
+        <option value="restaurant">All</option>
+        <option value="catering.restaurant">Restaurant</option>
+        <option value="catering.cafe">Cafe</option>
+        <option value="catering.fast_food">Fast Food</option>
+    </select>
 
-    <script>
-        const API_KEY = "6d723ee6434f4004baa52ff6b26a1702"; //
+    <button onclick="searchPlaces()">Search</button>
+    <button onclick="getLocation()">📍 Near Me</button>
+    <button onclick="toggleTheme()">🌙 Toggle</button>
+</div>
 
-        document.getElementById("searchBtn").addEventListener("click", searchRestaurants);
+<div id="map"></div>
 
-        async function searchRestaurants() {
-            const city = document.getElementById("cityInput").value.trim();
-            const resultsDiv = document.getElementById("results");
+<div id="results"></div>
 
-            if (!city) {
-                resultsDiv.innerHTML = "<p>Enter a city</p>";
-                return;
-            }
+</div>
 
-            resultsDiv.innerHTML = "<p>Loading...</p>";
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-            try {
-                // Geocode
-                const geoRes = await fetch(
-                    `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&apiKey=${API_KEY}`
-                );
+<script>
+const API_KEY = "6d723ee6434f4004baa52ff6b26a1702";
 
-                if (!geoRes.ok) throw new Error("Geo failed");
+let map = L.map('map').setView([20.5937, 78.9629], 5);
 
-                const geoData = await geoRes.json();
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
 
-                if (!geoData.features || geoData.features.length === 0) {
-                    resultsDiv.innerHTML = "<p>No location found</p>";
-                    return;
-                }
+let markers = [];
 
-                const { lat, lon } = geoData.features[0].properties;
+// THEME
+function toggleTheme() {
+    document.body.classList.toggle("light");
+}
 
-                // Places
-                const placesRes = await fetch(
-                    `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=10&apiKey=${API_KEY}`
-                );
+// FAVORITES
+function toggleFav(name) {
+    let favs = JSON.parse(localStorage.getItem("favs") || "[]");
 
-                if (!placesRes.ok) throw new Error("Places failed");
+    if (favs.includes(name)) {
+        favs = favs.filter(f => f !== name);
+    } else {
+        favs.push(name);
+    }
 
-                const placesData = await placesRes.json();
+    localStorage.setItem("favs", JSON.stringify(favs));
+    alert("Updated favorites");
+}
 
-                if (!placesData.features || placesData.features.length === 0) {
-                    resultsDiv.innerHTML = "<p>No restaurants found</p>";
-                    return;
-                }
+// LOCATION
+function getLocation() {
+    navigator.geolocation.getCurrentPosition(pos => {
+        fetchPlaces(pos.coords.latitude, pos.coords.longitude);
+    });
+}
 
-                // Render
-                resultsDiv.innerHTML = "";
+// SEARCH
+async function searchPlaces() {
+    const query = document.getElementById("searchInput").value.trim();
 
-                placesData.features.forEach(place => {
-                    const p = place.properties;
+    if (!query) return alert("Enter location");
 
-                    const div = document.createElement("div");
-                    div.className = "card";
+    const geo = await fetch(`https://api.geoapify.com/v1/geocode/search?text=${query}&apiKey=${API_KEY}`);
+    const geoData = await geo.json();
 
-                    div.innerHTML = `
-                        <h3>${p.name || "Unnamed"}</h3>
-                        <p>${p.address_line2 || "No address"}</p>
-                    `;
+    if (!geoData.features.length) return alert("Location not found");
 
-                    resultsDiv.appendChild(div);
-                });
+    const { lat, lon } = geoData.features[0].properties;
 
-            } catch (err) {
-                console.error(err);
-                resultsDiv.innerHTML = "<p style='color:red;'>Error. Check API key.</p>";
-            }
-        }
-    </script>
+    fetchPlaces(lat, lon);
+}
+
+// FETCH PLACES
+async function fetchPlaces(lat, lon) {
+    const results = document.getElementById("results");
+    const category = document.getElementById("category").value;
+
+    results.innerHTML = "Loading...";
+    
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    map.setView([lat, lon], 13);
+
+    const res = await fetch(`https://api.geoapify.com/v2/places?categories=${category}&filter=circle:${lon},${lat},5000&limit=15&apiKey=${API_KEY}`);
+    const data = await res.json();
+
+    results.innerHTML = "";
+
+    data.features.forEach(place => {
+        const p = place.properties;
+
+        // MAP MARKER
+        const marker = L.marker([p.lat, p.lon]).addTo(map)
+            .bindPopup(p.name || "Restaurant");
+
+        markers.push(marker);
+
+        // RANDOM RATING (UI ONLY)
+        const rating = (Math.random()*2+3).toFixed(1);
+
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+            <span class="favorite" onclick="toggleFav('${p.name}')">❤️</span>
+            <h3>${p.name || "Unnamed"}</h3>
+            <p>📍 ${p.address_line2 || "No address"}</p>
+            <p>⭐ ${rating} / 5</p>
+        `;
+
+        results.appendChild(div);
+    });
+}
+</script>
 
 </body>
 </html>
