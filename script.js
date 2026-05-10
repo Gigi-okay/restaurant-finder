@@ -14,9 +14,8 @@ async function searchRestaurants() {
   }
 
   try {
-    status.innerText = "🔍 Searching location...";
+    status.innerText = "🔍 Finding location...";
 
-    // Step 1: Get coordinates
     const geoRes = await fetch(
       `https://api.geoapify.com/v1/geocode/search?text=${query}&apiKey=${API_KEY}`
     );
@@ -29,21 +28,20 @@ async function searchRestaurants() {
 
     const { lat, lon } = geoData.features[0].properties;
 
-    status.innerText = "🍽 Fetching restaurants...";
+    status.innerText = "🍽 Loading restaurants...";
 
-    // Step 2: Get restaurants
     const placesRes = await fetch(
-      `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=10&apiKey=${API_KEY}`
+      `https://api.geoapify.com/v2/places?categories=catering.restaurant&filter=circle:${lon},${lat},5000&limit=12&apiKey=${API_KEY}`
     );
 
     const placesData = await placesRes.json();
 
     displayResults(placesData.features);
 
-    status.innerText = `✅ Found ${placesData.features.length} restaurants`;
+    status.innerText = `✅ ${placesData.features.length} restaurants found`;
 
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error(err);
     status.innerText = "❌ Something went wrong";
   }
 }
@@ -52,7 +50,7 @@ function displayResults(places) {
   const container = document.getElementById("results");
 
   if (!places.length) {
-    container.innerHTML = "<p>No restaurants found</p>";
+    container.innerHTML = `<p>No restaurants found</p>`;
     return;
   }
 
@@ -61,9 +59,13 @@ function displayResults(places) {
 
     container.innerHTML += `
       <div class="card">
-        <h3>${p.name || "No Name"}</h3>
+        <h3>${p.name || "Unnamed Restaurant"}</h3>
         <p>${p.address_line1 || ""}</p>
         <p>${p.address_line2 || ""}</p>
+
+        <div class="meta">
+          ${p.city || ""} • ${p.country || ""}
+        </div>
       </div>
     `;
   });
